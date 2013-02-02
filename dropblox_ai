@@ -3,12 +3,26 @@
 # Sample dropblox_ai exectuable.
 #
 
+import Queue
 import json
 import sys
 import time
+import multiprocessing
+from multiprocessing import Value, Lock, Process
 
 class InvalidMoveError(ValueError):
   pass
+
+def analyzeMoves(threadName, q):
+    while not exitFlag:
+        QueueLock.acquire()
+        if not workQueue.empty():
+            data = q.get()
+            queueLock.release()
+            print "%s processing %s" % (threadName, data)
+        else:
+            queueLock.release()
+        time.sleep(1)
 
 # A class representing an (i, j) position on a board.
 class Point(object):
@@ -194,6 +208,7 @@ class Board(object):
     new_bitmap = [row for row in bitmap if not all(row)]
     return [cols*[0] for i in range(rows - len(new_bitmap))] + new_bitmap
 
+global possibleMoves
 if __name__ == '__main__':
   if len(sys.argv) == 3:
     # This AI executable will be called with two arguments: a JSON blob of the
@@ -202,15 +217,14 @@ if __name__ == '__main__':
 
     # current board
     board = Board.construct_from_json(sys.argv[1])
-
     # current block
+
     block = board.block
 
     # very simple AI that moves the current block as far left as possible
-    moves = []                  # list of moves to make
-    while board.check(block):   # while the block in in a legal position
-      block.left()              # move the block left
-      moves.append('left')      # append a left command to oure moves list
+    possibleMoves = list()                 # list of moves to make
+    startThreads()
+    findBestMoveset()
     if len(moves) > 0:          # remove that last left command, as it got the block into an illegal state
       moves.pop()
     for move in moves:          # print our moves
@@ -222,3 +236,47 @@ if __name__ == '__main__':
     #while block.checked_left(board):
       #print 'left'
     #sys.stdout.flush()
+global level
+def startThreads(level, board, block, moves):
+    level = 1
+    print("starting new thread %d") % (level)
+    AI_Left = multiprocessing.Process(name="AI_Left", target=AI, args=(lock, board, block, level))
+    AI_Right = multiprocessing.Process(name="AI_Right", target=AI, args=(lock, board, block, level))    
+    AI_Left.start()
+    AI_Right.start()
+    AI_Left.join()
+    AI_Right.join()
+    level += 1
+
+def score(n):
+    return 2*n-1   
+
+def AI(lock, board, block, level):
+    name = multiprocessing.current_process().name
+    print name, 'Starting'
+    ##Make Best Move
+    if level == 1: 
+        if name == AI_Left:
+            for i in xrange(32):
+                moves[i] = [[[movelist],value]]
+        else:
+            for i in xrange(32,64):
+                moves[i] = [[[movelist],value]]
+    else:
+        spots = 64/level
+        if name == AI_Left:
+            for i in xrange(spots/2):
+                movelist = moves[i][0].append(movelist)
+                value = moves[i][1] + value
+                moves[i] = [[[movelist], value]]
+        else:
+            for i in xrange(spots/2, spots):
+                movelist = moves[i][0].append(movelist)
+                value = moves[i][1] + value
+                moves[i] = [[[movelist], value]]
+    print name, 'Exiting'
+    startThreads(level, board, block)
+
+def findBestMoveset(moves):
+    for i in xrange(len(moves)):
+        return 42
